@@ -16,6 +16,13 @@
 /******************************************************************************/
 /* #DEFINES                                                                   */
 /******************************************************************************/
+#define double_Lq   0.00334   /* H        */
+#define double_Ld   0.00333   /* H        */
+#define double_flux 0.171     /* Wb       */
+#define double_Rs   0.4578    /* ohm      */
+#define double_J    0.001469  /* Kg m2    */
+#define double_B    0.0003035 /* unitless */
+#define double_p    8.0       /* poles    */
 
 /******************************************************************************/
 /* MACROS                                                                     */
@@ -31,32 +38,24 @@ typedef struct{
    double Rs;
    double J;
    double B;
-   uint8  p;
+   double p;
 }Type_CfgSwcApplDigitalTwinMotorPMSM_st;
-
-typedef struct{
-   double Vq;
-   double Vd;
-   double Iq;
-   double Id;
-   double Te;
-   double Wm;
-   double We;
-   double Theta_e;
-   double Theta_m;
-}Type_SwcApplDigitalTwinMotorPMSM_stIntermediate;
 
 class Type_SwcApplDigitalTwinMotorPMSM : public Type_infClientSwcApplDigitalTwinMotorPMSM{
    private:
-      const Type_CfgSwcApplDigitalTwinMotorPMSM_st*         pcstCfgst;
-            Type_SwcApplDigitalTwinMotorPMSM_stIntermediate stIntermediate;
+      const Type_CfgSwcApplDigitalTwinMotorPMSM_st*              pcstCfgst;
+      const Type_infClientSwcApplDigitalTwinMotorPMSM_stInputs*  pcstInputs;
+            Type_SwcApplDigitalTwinMotorPMSM_stIntermediate*     pstIntermediate;
+            Type_infClientSwcApplDigitalTwinMotorPMSM_stOutputs* pstOutputs;
 
    public:
       void InitFunction(
             const Type_infClientSwcApplDigitalTwinMotorPMSM_stInputs*  lpcstInputs
+         ,        Type_SwcApplDigitalTwinMotorPMSM_stIntermediate*     lpstIntermediate
          ,        Type_infClientSwcApplDigitalTwinMotorPMSM_stOutputs* lpstOutputs
       );
-      void MainFunction(void);
+      void MainFunction   (void);
+      void DeInitFunction (void);
 };
 
 /******************************************************************************/
@@ -67,13 +66,13 @@ class Type_SwcApplDigitalTwinMotorPMSM : public Type_infClientSwcApplDigitalTwin
 /* PARAMS                                                                     */
 /******************************************************************************/
 const Type_CfgSwcApplDigitalTwinMotorPMSM_st CfgSwcApplDigitalTwinMotorPMSM_st = {
-      0.00334   /* H        */
-   ,  0.00333   /* H        */
-   ,  0.171     /* Wb       */
-   ,  0.4578    /* ohm      */
-   ,  0.001469  /* Kg m2    */
-   ,  0.0003035 /* unitless */
-   ,  8
+      double_Lq
+   ,  double_Ld
+   ,  double_flux
+   ,  double_Rs
+   ,  double_J
+   ,  double_B
+   ,  double_p
 };
 
 /******************************************************************************/
@@ -85,67 +84,254 @@ Type_infClientSwcApplDigitalTwinMotorPMSM* pinfClientSwcApplDigitalTwinMotorPMSM
 /******************************************************************************/
 /* FUNCTIONS                                                                  */
 /******************************************************************************/
+#include "interface_LogAndTrace.hpp"
 void Type_SwcApplDigitalTwinMotorPMSM::InitFunction(
       const Type_infClientSwcApplDigitalTwinMotorPMSM_stInputs*  lpcstInputs
+   ,        Type_SwcApplDigitalTwinMotorPMSM_stIntermediate*     lpstIntermediate
    ,        Type_infClientSwcApplDigitalTwinMotorPMSM_stOutputs* lpstOutputs
 ){
-   this->pcstInputs             = lpcstInputs;
-   this->pstOutputs             = lpstOutputs;
-   this->pcstCfgst              = &CfgSwcApplDigitalTwinMotorPMSM_st;
-   this->stIntermediate.Vq      = 0.0;
-   this->stIntermediate.Vd      = 0.0;
-   this->stIntermediate.Iq      = 0.0;
-   this->stIntermediate.Id      = 0.0;
-   this->stIntermediate.Te      = 0.0;
-   this->stIntermediate.Wm      = 0.0;
-   this->stIntermediate.We      = 0.0;
-   this->stIntermediate.Theta_e = 0.0;
-   this->stIntermediate.Theta_m = 0.0;
+   pinfLog->InitFunction("log_pProjectVirtualEcu_DigitalTwinMotorPMSM_Rb_calcFloatingPoint.csv"); // TBD: Remove hardcode and pass control promt argument
+   this->pcstInputs                   = lpcstInputs;
+   this->pstIntermediate              = lpstIntermediate;
+   this->pstOutputs                   = lpstOutputs;
+   this->pcstCfgst                    = &CfgSwcApplDigitalTwinMotorPMSM_st;
+   this->pstIntermediate->Iq          = 0.0;
+   this->pstIntermediate->Id          = 0.0;
+   this->pstIntermediate->Wm          = 0.0;
+   this->pstIntermediate->We          = 0.0;
+   this->pstIntermediate->Theta_e     = 0.0;
+   this->pstIntermediate->Theta_e_cos = 1.0;
+   this->pstIntermediate->Theta_e_sin = 0.0;
 }
 
 #include <cmath>
+const double dt = double_dt;
 void Type_SwcApplDigitalTwinMotorPMSM::MainFunction(void){
-   double Iq_z        = this->stIntermediate.Iq;
-   double Id_z        = this->stIntermediate.Id;
-   double f64Fqx3     = 2*this->pcstInputs->Va - this->pcstInputs->Vb - this->pcstInputs->Vc;
-   double f64Fdxsqrt3 =                        - this->pcstInputs->Vb + this->pcstInputs->Vc;
-   this->stIntermediate.Vq = f64Fqx3*cos(this->stIntermediate.Theta_e)/3.0 - f64Fdxsqrt3*sin(this->stIntermediate.Theta_e)/sqrt(3.0);
-   this->stIntermediate.Vd = f64Fqx3*sin(this->stIntermediate.Theta_e)/3.0 + f64Fdxsqrt3*cos(this->stIntermediate.Theta_e)/sqrt(3.0);
+   Type_SwcApplDigitalTwinMotorPMSM_stLocals stLocals;
+   stLocals.Fqx3     = 2*this->pcstInputs->Va - this->pcstInputs->Vb - this->pcstInputs->Vc;
+   stLocals.Fdxsqrt3 =                        - this->pcstInputs->Vb + this->pcstInputs->Vc;
 
-   double lf64Dq = (
-         this->stIntermediate.Vq
-      -  this->pcstCfgst->Ld   * (Id_z * this->stIntermediate.We)
-      -  this->pcstCfgst->Rs   * Iq_z
-      -  this->pcstCfgst->flux * this->stIntermediate.We
-   )/this->pcstCfgst->Lq;
-   this->stIntermediate.Iq += lf64Dq * dt;
-   double lf64Dd = (
-         this->stIntermediate.Vd
-      +  this->pcstCfgst->Lq * (Iq_z * this->stIntermediate.We)
-      -  this->pcstCfgst->Rs * Id_z
-   )/this->pcstCfgst->Ld;
-   this->stIntermediate.Id += lf64Dd * dt;
+   stLocals.Vq = (
+         (
+               (
+                     stLocals.Fqx3
+                  *  this->pstIntermediate->Theta_e_cos
+               )
+            /  3.0
+         )
+      -  (
+               (
+                     stLocals.Fdxsqrt3
+                  *  this->pstIntermediate->Theta_e_sin
+               )
+            /  sqrt(3.0)
+         )
+   );
 
-   this->stIntermediate.Te = 3 * this->pcstCfgst->p * this->stIntermediate.Iq * (
-         this->pcstCfgst->flux
-      +  (this->pcstCfgst->Ld - this->pcstCfgst->Lq) * this->stIntermediate.Id
-   ) / 4;
+   stLocals.Vd = (
+         (
+               (
+                     stLocals.Fqx3
+                  *  this->pstIntermediate->Theta_e_sin
+               )
+            /  3.0
+         )
+      +  (
+               (
+                     stLocals.Fdxsqrt3
+                  *  this->pstIntermediate->Theta_e_cos
+               )
+            /  sqrt(3.0)
+         )
+   );
 
-   double lf64DWm = (
-                        +  this->stIntermediate.Te
-                        -  this->pcstInputs->Tm
-                        -  this->pcstCfgst->B * this->stIntermediate.Wm
-                    ) / this->pcstCfgst->J;
-   this->stIntermediate.Wm      += lf64DWm * dt;
-   this->stIntermediate.We       = this->pcstCfgst->p * this->stIntermediate.Wm / 2;
-   this->stIntermediate.Theta_e += this->stIntermediate.We * dt;
-   this->stIntermediate.Theta_m  = 2 * this->stIntermediate.Theta_e / this->pcstCfgst->p;
+   stLocals.Dq = (
+         (
+               stLocals.Vq
+            -  (
+                     this->pcstCfgst->Ld
+                  *  (
+                           this->pstIntermediate->Id
+                        *  this->pstIntermediate->We
+                     )
+               )
+            -  (
+                     this->pcstCfgst->Rs
+                  *  this->pstIntermediate->Iq
+               )
+            -  (
+                     this->pcstCfgst->flux
+                  *  this->pstIntermediate->We
+               )
+         )
+      /  this->pcstCfgst->Lq
+   );
 
-   double lf64Ialpha =  this->stIntermediate.Iq * cos(this->stIntermediate.Theta_e) + this->stIntermediate.Id * sin(this->stIntermediate.Theta_e);
-   double lf64Ibeta  = -this->stIntermediate.Iq * sin(this->stIntermediate.Theta_e) + this->stIntermediate.Id * cos(this->stIntermediate.Theta_e);
-   this->pstOutputs->Ia =   lf64Ialpha;
-   this->pstOutputs->Ib = -(lf64Ialpha + sqrt(3)*lf64Ibeta)/2;
-   this->pstOutputs->Ic = -(lf64Ialpha - sqrt(3)*lf64Ibeta)/2;
+   stLocals.Dd = (
+         (
+               stLocals.Vd
+            +  (
+                     this->pcstCfgst->Lq
+                  *  (
+                           this->pstIntermediate->Iq
+                        *  this->pstIntermediate->We
+                     )
+               )
+            -  (
+                     this->pcstCfgst->Rs
+                  *  this->pstIntermediate->Id
+               )
+         )
+      /  this->pcstCfgst->Ld
+   );
+
+   this->pstIntermediate->Iq += (
+         stLocals.Dq
+      *  dt
+   );
+
+   this->pstIntermediate->Id += (
+         stLocals.Dd
+      *  dt
+   );
+
+   stLocals.Te = (
+         (
+               3
+            *  (
+                     this->pcstCfgst->p
+                  *  (
+                           this->pstIntermediate->Iq
+                        *  (
+                                 this->pcstCfgst->flux
+                              +  (
+                                       (this->pcstCfgst->Ld - this->pcstCfgst->Lq)
+                                    *  this->pstIntermediate->Id
+                                 )
+                           )
+                     )
+               )
+         )
+      /  4
+   );
+
+   stLocals.DWm = (
+         (
+            +  stLocals.Te
+            -  this->pcstInputs->Tm
+            -  (
+                     this->pcstCfgst->B
+                  *  this->pstIntermediate->Wm
+               )
+         )
+      /  this->pcstCfgst->J
+   );
+
+   this->pstIntermediate->Wm += (
+         stLocals.DWm
+      *  dt
+   );
+
+   this->pstIntermediate->We = (
+         (
+               this->pcstCfgst->p
+            *  this->pstIntermediate->Wm
+         )
+      /  2
+   );
+
+   this->pstIntermediate->Theta_e += (
+         this->pstIntermediate->We
+      *  dt
+   );
+
+   this->pstIntermediate->Theta_e_cos = cos(this->pstIntermediate->Theta_e);
+   this->pstIntermediate->Theta_e_sin = sin(this->pstIntermediate->Theta_e);
+
+   stLocals.Theta_m = (
+         (
+               2
+            *  this->pstIntermediate->Theta_e
+         )
+      /  this->pcstCfgst->p
+   );
+
+   stLocals.Ialpha = (
+         (
+               this->pstIntermediate->Iq
+            *  this->pstIntermediate->Theta_e_cos
+         )
+      +  (
+               this->pstIntermediate->Id
+            *  this->pstIntermediate->Theta_e_sin
+         )
+   );
+
+   stLocals.Ibeta = (
+      -  (
+               this->pstIntermediate->Iq
+            *  this->pstIntermediate->Theta_e_sin
+         )
+      +  (
+               this->pstIntermediate->Id
+            *  this->pstIntermediate->Theta_e_cos
+         )
+   );
+
+   stLocals.Ibetaxsqrt3p0 = (
+         sqrt(3)
+      *  stLocals.Ibeta
+   );
+
+   this->pstOutputs->Ia = stLocals.Ialpha;
+
+   this->pstOutputs->Ib = -(
+         (
+               stLocals.Ialpha
+            +  stLocals.Ibetaxsqrt3p0
+         )
+      /  2
+   );
+
+   this->pstOutputs->Ic = -(
+         (
+               stLocals.Ialpha
+            -  stLocals.Ibetaxsqrt3p0
+         )
+      /  2
+   );
+
+   pinfLog->MainFunction(
+         this->pcstInputs->Tm
+      ,  this->pcstInputs->Va
+      ,  this->pcstInputs->Vb
+      ,  this->pcstInputs->Vc
+      ,  stLocals.Fqx3
+      ,  stLocals.Fdxsqrt3
+      ,  stLocals.Vq
+      ,  stLocals.Vd
+      ,  stLocals.Dq
+      ,  stLocals.Dd
+      ,  this->pstIntermediate->Iq
+      ,  this->pstIntermediate->Id
+      ,  stLocals.Te
+      ,  stLocals.DWm
+      ,  this->pstIntermediate->Wm
+      ,  this->pstIntermediate->We
+      ,  this->pstIntermediate->Theta_e
+      ,  this->pstIntermediate->Theta_e_cos
+      ,  this->pstIntermediate->Theta_e_sin
+      ,  stLocals.Theta_m
+      ,  stLocals.Ialpha
+      ,  stLocals.Ibeta
+      ,  this->pstOutputs->Ia
+      ,  this->pstOutputs->Ib
+      ,  this->pstOutputs->Ic
+   );
+}
+
+void Type_SwcApplDigitalTwinMotorPMSM::DeInitFunction(void){
+   pinfLog->DeInitFunction();
 }
 
 /******************************************************************************/

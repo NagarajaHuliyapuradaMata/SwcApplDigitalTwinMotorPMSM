@@ -33,15 +33,40 @@ typedef struct{
    double Ic;
 }Type_infClientSwcApplDigitalTwinMotorPMSM_stOutputs;
 
+typedef struct{
+   double Iq;
+   double Id;
+   double Wm;
+   double We;
+   double Theta_e;
+   double Theta_e_cos;
+   double Theta_e_sin;
+}Type_SwcApplDigitalTwinMotorPMSM_stIntermediate;
+
+typedef struct{
+   double Fqx3;
+   double Fdxsqrt3;
+   double Vq;
+   double Vd;
+   double Dq;
+   double Dd;
+   double Te;
+   double DWm;
+   double Theta_m; // TBD: Remove
+   double Ialpha;
+   double Ibeta;
+   double Ibetaxsqrt3p0;
+}Type_SwcApplDigitalTwinMotorPMSM_stLocals;
+
 class Type_infClientSwcApplDigitalTwinMotorPMSM{
    public:
-      const Type_infClientSwcApplDigitalTwinMotorPMSM_stInputs*  pcstInputs;
-            Type_infClientSwcApplDigitalTwinMotorPMSM_stOutputs* pstOutputs;
       virtual void InitFunction(
             const Type_infClientSwcApplDigitalTwinMotorPMSM_stInputs*  lpcstInputs
+         ,        Type_SwcApplDigitalTwinMotorPMSM_stIntermediate*     lpstIntermediate
          ,        Type_infClientSwcApplDigitalTwinMotorPMSM_stOutputs* lpstOutputs
       ) = 0;
-      virtual void MainFunction(void) = 0;
+      virtual void MainFunction   (void) = 0;
+      virtual void DeInitFunction (void) = 0;
 };
 
 /******************************************************************************/
